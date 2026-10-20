@@ -53,20 +53,16 @@ Emails are not collected: Google Maps does not publish them and the extension ne
 ## Development
 
 ```sh
-npm install          # playwright-core, only for the asset scripts
+npm install          # playwright-core, only for the icon script
 npm test             # parser and CSV tests against a real Maps response in test/fixtures
 npm run package      # dist/maps-lead-scraper-<version>.zip for the Chrome Web Store
 ```
 
-Asset scripts need a [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) binary in `CHROME_PATH` (branded Chrome no longer loads unpacked extensions from the command line):
+Icons are rendered from `extension/icons/icon.svg` with a [Chrome for Testing](https://googlechromelabs.github.io/chrome-for-testing/) binary:
 
 ```sh
-CHROME_PATH=/path/to/chrome node scripts/render-icons.mjs     # extension/icons/*.png from icon.svg
-CHROME_PATH=/path/to/chrome node scripts/promo/record.mjs     # live area sweep → store/build/raw
-CHROME_PATH=/path/to/chrome node scripts/promo/compose.mjs    # store screenshots, promo tiles, promo.mp4
+CHROME_PATH=/path/to/chrome node scripts/render-icons.mjs
 ```
-
-Store listing texts and permission justifications are in [`store/listing.md`](store/listing.md).
 
 ## Privacy
 

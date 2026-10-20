@@ -2,4 +2,6 @@ node_modules/
 .DS_Store
 *.zip
 dist/
-store/build/
+# Promo and store materials stay local
+scripts/promo/
+store/
