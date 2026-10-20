@@ -14,7 +14,7 @@
 
 ## Features
 
-- **Area sweep**: the map moves by itself in a spiral (3×3, 5×5 or 7×7 spots) and the results list is emptied at every spot. In the demo above, a 3×3 sweep collected 282 coffee shops in under 3 minutes.
+- **Area sweep**: the map moves by itself in a spiral (3×3, 5×5 or 7×7 spots) and the results list is emptied at every spot. In the demo above, a 3×3 sweep collected 306 coffee shops in under 4 minutes (phone numbers are masked in the demo).
 - **This list**: scrolls the current results list to its end, then stops.
 - **Manual**: only records what you browse.
 - Live counts for phones, websites, businesses without a website and social profiles.

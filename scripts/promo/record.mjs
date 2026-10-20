@@ -3,6 +3,7 @@
 // Usage: CHROME_PATH=/path/to/chrome-for-testing node scripts/promo/record.mjs ["query"] [lat,lng,zoom]
 import { chromium } from 'playwright-core';
 import { mkdirSync, rmSync, writeFileSync, renameSync } from 'node:fs';
+import { maskPhones, installPhoneMask } from './mask.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
 const extensionDir = `${root}extension`;
@@ -21,6 +22,8 @@ const ctx = await chromium.launchPersistentContext(`${out}/profile`, {
   viewport: { width: 1400, height: 900 },
   recordVideo: { dir: `${out}/video`, size: { width: 1400, height: 900 } },
 });
+// Promo material must not show dialable phone numbers, in Maps or in the panel.
+await ctx.addInitScript({ content: `(${installPhoneMask})(${maskPhones})` });
 const worker = ctx.serviceWorkers()[0] || (await ctx.waitForEvent('serviceworker'));
 const extensionId = new URL(worker.url()).host;
 
@@ -52,9 +55,12 @@ await call('panel:start', { tabId: tab.id, url: tab.url });
 
 let snap;
 let midShot = false;
+timing.spots = [];
 while (Date.now() - t0 < 6 * 60_000) {
   await maps.waitForTimeout(1000);
   snap = (await call('panel:snapshot')).result;
+  // When each sweep spot started, so compose.mjs can cut the repetitive middle.
+  while (snap.state.running && timing.spots.length < snap.state.areaStep + 1) timing.spots.push((Date.now() - t0) / 1000);
   if (!midShot && snap.state.areaStep >= 4) {
     midShot = true;
     mark('midShot');

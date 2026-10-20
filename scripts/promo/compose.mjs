@@ -5,6 +5,7 @@
 import { chromium } from 'playwright-core';
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { maskPhones } from './mask.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
 const raw = `${root}store/build/raw`;
@@ -80,7 +81,7 @@ const panelWindow = (style, shot, width) =>
 const COLUMNS = {
   name: ['Name', (r) => r.name],
   category: ['Category', (r) => r.category],
-  phone: ['Phone', (r) => r.phone || '—'],
+  phone: ['Phone', (r) => (r.phone ? maskPhones(r.phone) : '—')],
   website: ['Website', (r) => r.domain || '—'],
   rating: ['Rating', (r) => r.rating ?? '—'],
 };
@@ -186,7 +187,12 @@ await render(
   1080,
 );
 await render(`<div></div>`, `${frames}/stage.png`, 1920, 1080);
-const captions = ['Area sweep moves the map <span class="accent">by itself</span>', '…and empties the results list <span class="accent">at every spot</span>', `<span class="accent">${total} coffee shops</span> in under 3 minutes`];
+const spotCount = run.timing.spots.length;
+const captions = [
+  'Area sweep moves the map <span class="accent">by itself</span>',
+  '…and empties the results list <span class="accent">at every spot</span>',
+  `<span class="accent">${total} ${esc(run.query)}</span> in under ${Math.ceil((run.timing.sweepEnd - run.timing.sweepStart) / 60)} minutes`,
+];
 for (const [i, text] of captions.entries()) {
   await render(
     `<div style="position:absolute;top:44px;width:100%;text-align:center" class="h"><span style="font-size:64px;text-shadow:0 4px 30px rgba(0,0,0,.4)">${text}</span></div>`,
@@ -196,6 +202,15 @@ for (const [i, text] of captions.entries()) {
     { clear: true },
   );
 }
+await render(
+  `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+     <span style="padding:12px 26px;border-radius:999px;background:rgba(13,20,48,.82);font-size:30px;font-weight:650">⏩ Spots 2–${spotCount}</span>
+   </div>`,
+  `${frames}/fast-forward.png`,
+  320,
+  80,
+  { clear: true },
+);
 const mask = (w, h, file) => render(`<div style="width:${w}px;height:${h}px;background:#fff;border-radius:18px"></div>`, file, w, h, { clear: true });
 await mask(1360, 874, `${frames}/mask-maps.png`);
 await mask(408, 874, `${frames}/mask-panel.png`);
@@ -226,47 +241,73 @@ await browser.close();
 // ---------- Promo video ----------
 const ff = (args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
 const enc = ['-c:v', 'libx264', '-preset', 'slow', '-crf', '18', '-pix_fmt', 'yuv420p', '-r', '30'];
-const still = (name, seconds) =>
-  ff(['-loop', '1', '-t', String(seconds), '-i', `${frames}/${name}.png`, '-vf', `fade=t=in:st=0:d=0.5,fade=t=out:st=${seconds - 0.5}:d=0.5`, ...enc, `${frames}/${name}.mp4`]);
+const stills = { intro: 3, step: 2.5, export: 3.5, outro: 4 };
+const still = (name) =>
+  ff(['-loop', '1', '-t', String(stills[name]), '-i', `${frames}/${name}.png`, '-vf', `fade=t=in:st=0:d=0.4,fade=t=out:st=${stills[name] - 0.4}:d=0.4`, ...enc, `${frames}/${name}.mp4`]);
 
-still('intro', 3.5);
-still('step', 3);
+// The sweep repeats the same thing at every spot, so only the first spot and the
+// first hop play at normal promo speed; the middle spots fly by and the finish slows down again.
+const { panelPage, sweepStart, sweepEnd, spots } = run.timing;
+const firstHopDone = Math.min((spots[1] ?? sweepStart + 20) + 4, sweepEnd - 12);
+const finishFrom = sweepEnd - 6;
+const parts = [
+  { from: sweepStart, to: firstHopDone, speed: 5 },
+  { from: firstHopDone, to: finishFrom, speed: (finishFrom - firstHopDone) / 3.5 },
+  { from: finishFrom, to: sweepEnd + 1.5, speed: 3 },
+];
+const lengths = parts.map((p) => (p.to - p.from) / p.speed);
+const [a, b] = [lengths[0], lengths[0] + lengths[1]];
+const sweepLength = lengths.reduce((x, y) => x + y, 0);
 
-// Both recordings share one clock (run.timing); trim them to the sweep and speed it up.
-const SPEED = 5;
-const { panelPage, sweepStart, sweepEnd } = run.timing;
-const span = sweepEnd - sweepStart + 1.5;
-const out = span / SPEED;
-const third = out / 3;
+// Both recordings share the clock of run.timing; the panel video starts later.
+const cut = (input, offset, label, tail) =>
+  [
+    `[${input}:v]split=3${parts.map((_, i) => `[${label}s${i}]`).join('')}`,
+    ...parts.map((p, i) => `[${label}s${i}]trim=start=${p.from - offset}:end=${p.to - offset},setpts=(PTS-STARTPTS)/${p.speed}[${label}${i}]`),
+    `${parts.map((_, i) => `[${label}${i}]`).join('')}concat=n=${parts.length}:v=1:a=0,fps=30,${tail},format=rgba[${label}]`,
+  ].join(';');
+
+still('intro');
+still('step');
 ff([
   '-loop', '1', '-i', `${frames}/stage.png`,
-  '-ss', String(sweepStart), '-t', String(span), '-i', `${raw}/maps.webm`,
-  '-ss', String(sweepStart - panelPage), '-t', String(span), '-i', `${raw}/panel.webm`,
+  '-i', `${raw}/maps.webm`,
+  '-i', `${raw}/panel.webm`,
   '-loop', '1', '-i', `${frames}/mask-maps.png`,
   '-loop', '1', '-i', `${frames}/mask-panel.png`,
   '-loop', '1', '-i', `${frames}/caption1.png`,
   '-loop', '1', '-i', `${frames}/caption2.png`,
   '-loop', '1', '-i', `${frames}/caption3.png`,
+  '-loop', '1', '-i', `${frames}/fast-forward.png`,
   '-filter_complex',
   [
-    `[1:v]setpts=(PTS-STARTPTS)/${SPEED},fps=30,scale=1360:874,format=rgba[m]`,
+    cut(1, 0, 'm', 'scale=1360:874'),
     `[3:v]format=gray[mm]`,
     `[m][mm]alphamerge[mr]`,
     // The panel recording holds the 380px-wide page in the top-left 380x813 of the frame.
-    `[2:v]setpts=(PTS-STARTPTS)/${SPEED},fps=30,crop=380:813:0:0,scale=408:874,format=rgba[p]`,
+    cut(2, panelPage, 'p', 'crop=380:813:0:0,scale=408:874'),
     `[4:v]format=gray[pm]`,
     `[p][pm]alphamerge[pr]`,
-    `[0:v][mr]overlay=66:180:shortest=1[a]`,
-    `[a][pr]overlay=1446:180[b]`,
-    `[b][5:v]overlay=0:0:enable='lt(t,${third})'[c]`,
-    `[c][6:v]overlay=0:0:enable='between(t,${third},${2 * third})'[d]`,
-    `[d][7:v]overlay=0:0:enable='gt(t,${2 * third})',fade=t=in:st=0:d=0.4,fade=t=out:st=${out - 0.4}:d=0.4[v]`,
+    `[0:v][mr]overlay=66:180:shortest=1[v1]`,
+    `[v1][pr]overlay=1446:180[v2]`,
+    `[v2][5:v]overlay=0:0:enable='lt(t,${a})'[v3]`,
+    `[v3][6:v]overlay=0:0:enable='between(t,${a},${b})'[v4]`,
+    `[v4][8:v]overlay=${66 + 1360 - 340}:${180 + 24}:enable='between(t,${a},${b})'[v5]`,
+    `[v5][7:v]overlay=0:0:enable='gt(t,${b})',fade=t=in:st=0:d=0.3,fade=t=out:st=${sweepLength - 0.3}:d=0.3[v]`,
   ].join(';'),
-  '-map', '[v]', '-t', String(out), ...enc, `${frames}/sweep.mp4`,
+  '-map', '[v]', '-t', String(sweepLength), ...enc, `${frames}/sweep.mp4`,
 ]);
+still('export');
+still('outro');
 
-still('export', 4);
-still('outro', 4.5);
 writeFileSync(`${frames}/list.txt`, ['intro', 'step', 'sweep', 'export', 'outro'].map((n) => `file '${frames}/${n}.mp4'`).join('\n'));
 ff(['-f', 'concat', '-safe', '0', '-i', `${frames}/list.txt`, '-c', 'copy', '-movflags', '+faststart', `${build}/promo.mp4`]);
-console.log(`promo: ${build}/promo.mp4 (${(3.5 + 3 + out + 4 + 4.5).toFixed(1)}s)`);
+
+// README demo: the sweep part only, as a GIF.
+ff([
+  '-i', `${frames}/sweep.mp4`,
+  '-vf', 'fps=10,scale=800:-1:flags=lanczos,split[x][y];[x]palettegen=max_colors=128:stats_mode=diff[pal];[y][pal]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle',
+  `${root}docs/area-sweep.gif`,
+]);
+const totalLength = Object.values(stills).reduce((x, y) => x + y, 0) + sweepLength;
+console.log(`promo: ${build}/promo.mp4 (${totalLength.toFixed(1)}s, sweep ${lengths.map((l) => l.toFixed(1)).join(' + ')}s)`);
