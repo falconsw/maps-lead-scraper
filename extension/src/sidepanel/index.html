@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Maps Lead Scraper</title>
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <nav class="tabs">
+      <span class="brand">maps<b>leads</b></span>
+      <button class="tab active" data-tab="capture">Capture</button>
+      <button class="tab" data-tab="history">History</button>
+    </nav>
+
+    <main id="capture" class="view">
+      <section class="card">
+        <div class="controls">
+          <button id="start" class="btn primary">Start</button>
+          <button id="stop" class="btn round danger" title="Stop" aria-label="Stop"><span class="square"></span></button>
+          <button id="new-session" class="btn round" title="New session" aria-label="New session">↻</button>
+          <button id="export" class="btn round" title="Export CSV" aria-label="Export CSV">⤓</button>
+        </div>
+        <div class="progress"><div id="progress-bar"></div></div>
+        <p id="status" class="status">Idle</p>
+        <div class="modes" role="radiogroup" aria-label="Capture mode">
+          <button class="chip mode" role="radio" data-mode="list" title="Scroll this results list to its end, then stop">This list</button>
+          <button class="chip mode" role="radio" data-mode="area" title="Move the map by itself in a spiral and empty the list at every spot">Area sweep</button>
+          <button class="chip mode" role="radio" data-mode="manual" title="Only record what you browse yourself">Manual</button>
+        </div>
+        <label class="area-size" id="area-size-row">
+          <span>Area to sweep</span>
+          <select id="area-size">
+            <option value="1">3 × 3 spots</option>
+            <option value="2">5 × 5 spots</option>
+            <option value="3">7 × 7 spots</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card">
+        <header class="card-head">
+          <span>Businesses</span>
+          <strong id="total">0</strong>
+        </header>
+        <div class="metrics">
+          <div class="metric" data-key="phones"><span>Phones</span><b>0</b><i><em></em></i></div>
+          <div class="metric" data-key="websites"><span>Website</span><b>0</b><i><em></em></i></div>
+          <div class="metric" data-key="noWebsite"><span>No website</span><b>0</b><i><em></em></i></div>
+          <div class="metric" data-key="socials"><span>Socials</span><b>0</b><i><em></em></i></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <header class="card-head">
+          <span>Search filters</span>
+          <strong id="filtered">0</strong>
+        </header>
+        <div id="filters" class="chips"></div>
+      </section>
+
+      <section class="card">
+        <header class="card-head"><span>Latest captured</span></header>
+        <ul id="recent" class="list"></ul>
+      </section>
+    </main>
+
+    <main id="history" class="view" hidden>
+      <ul id="sessions" class="list sessions"></ul>
+    </main>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

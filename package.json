@@ -1,0 +1,20 @@
+{
+  "name": "maps-lead-scraper",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome extension that collects business leads from Google Maps searches",
+  "scripts": {
+    "test": "node --test test/",
+    "package": "sh scripts/package.sh",
+    "icons": "node scripts/render-icons.mjs"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/falconsw/maps-lead-scraper.git"
+  },
+  "devDependencies": {
+    "playwright-core": "1.64.0"
+  }
+}
